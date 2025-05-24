@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Play.Common/.idea/.idea.Play.Common/.idea
+/Play.Common/.vscode
