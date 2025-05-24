@@ -1,3 +1,5 @@
+using MassTransit;
+using MassTransit.Definition;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -5,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using Play.Catalog.Service.Entities;
+using Play.Common.MassTransit;
 using Play.Common.MongoDB;
 using Play.Common.Settings;
 
@@ -12,6 +15,8 @@ namespace Play.Catalog.Service
 {
     public class Startup
     {
+        private const string AllowedOriginSetting = "AllowedOrigin";
+        
         private ServiceSettings _serviceSettings;
         public Startup(IConfiguration configuration)
         {
@@ -26,7 +31,8 @@ namespace Play.Catalog.Service
             _serviceSettings = Configuration.GetSection(nameof(ServiceSettings)).Get<ServiceSettings>();
 
             services.AddMongo()
-                    .AddMongoRepository<Item>("items");
+                    .AddMongoRepository<Item>("items")
+                    .AddMassTransitWithRabbitMq();
 
             services.AddControllers(options =>
             {
@@ -47,6 +53,12 @@ namespace Play.Catalog.Service
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Play.Catalog.Service v1"));
+                app.UseCors(options =>
+                {
+                    options.WithOrigins(Configuration[AllowedOriginSetting]) 
+                           .AllowAnyHeader()
+                           .AllowAnyMethod();
+                });
             }
 
             app.UseHttpsRedirection();

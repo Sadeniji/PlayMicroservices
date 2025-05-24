@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using System;
 using Play.Common;
+using MassTransit;
+using Play.Catalog.Contracts;
 
 namespace Play.Catalog.Service.Controllers
 {
@@ -13,34 +15,19 @@ namespace Play.Catalog.Service.Controllers
     public class ItemsController : ControllerBase
     {
         private readonly IRepository<Item> _repository;
-        private static int requestCounter = 0;
+        private readonly IPublishEndpoint _publishEndPoint;
 
-        public ItemsController(IRepository<Item> repository)
+        public ItemsController(IRepository<Item> repository, IPublishEndpoint publishEndPoint)
         {
             _repository = repository;
+            _publishEndPoint = publishEndPoint;
         }
 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ItemDto>>> GetAsync()
         {
-            requestCounter++;
-            Console.WriteLine($"Request {requestCounter}: Starting...");
-
-            if (requestCounter <= 2)
-            {
-                Console.WriteLine($"Request {requestCounter}: Delaying...");
-                await Task.Delay(TimeSpan.FromSeconds(10));
-            }
-
-            if (requestCounter <= 4)
-            {
-                Console.WriteLine($"Request {requestCounter}: 500 (Internal Server Error)...");
-                return StatusCode(500);
-            }
-
             var items = (await _repository.GetAllAsync()).Select(item => item.AsDto());
 
-            Console.WriteLine($"Request {requestCounter}: 200 (Ok).");
             return Ok(items);
         }
 
@@ -58,6 +45,7 @@ namespace Play.Catalog.Service.Controllers
             var newItem = createItemDto.AsItem();
             await _repository.CreateAsync(newItem);
 
+            await _publishEndPoint.Publish(new CatalogItemCreated(newItem.Id, newItem.Name, newItem.Description));
             return CreatedAtAction(nameof(GetByIdAsync), new { Id = newItem.Id }, newItem);
         }
 
@@ -77,6 +65,7 @@ namespace Play.Catalog.Service.Controllers
 
             await _repository.UpdateAsync(existingItem);
 
+            await _publishEndPoint.Publish(new CatalogItemUpdated(existingItem.Id, existingItem.Name, existingItem.Description));
             return NoContent();
         }
 
@@ -92,6 +81,8 @@ namespace Play.Catalog.Service.Controllers
 
             await _repository.DeleteAsync(id);
 
+
+            await _publishEndPoint.Publish(new CatalogItemDeleted(id));
             return NoContent();
         }
     }
